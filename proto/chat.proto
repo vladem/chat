@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+option go_package = "whcrc/chat/proto";
+
+message Message {
+    uint64 timestamp = 1;
+    uint64 message_id = 2;
+    bytes sender_id = 3;
+    bytes reciever_id = 4;
+    bytes data = 5;
+}
+
+message SendResponse {
+}
+
+message RecieveRequest {
+    bytes reciever_id = 3;
+}
+
+message RecieveResponse {
+    // message MessageViewed {
+    //     uint64 message_id = 1;
+    // }
+
+    oneof event {
+        Message incomming_message = 1;
+        // MessageViewed message_viewed = 2;
+    }
+}
+
+service Chat {
+    rpc Send(Message) returns (SendResponse);
+    rpc Recieve(RecieveRequest) returns (stream RecieveResponse);
+}

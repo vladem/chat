@@ -12,32 +12,32 @@ import (
 )
 
 var (
-	addr          = flag.String("addr", "localhost:8080", "chat server address")
-	reciever_id   = flag.String("reciever_id", "", "reciever_id")
-	sender_id     = flag.String("sender_id", "", "sender_id")
-	reciever_mode = flag.Bool("reciever_mode", true, "reciever mode")
+	addr         = flag.String("addr", "localhost:8080", "chat server address")
+	receiverId   = flag.String("receiver_id", "", "receiver_id")
+	senderId     = flag.String("sender_id", "", "sender_id")
+	receiverMode = flag.Bool("receiver_mode", true, "receiver mode")
 )
 
-func recieve(reciever_id string, chatClient *pb.ChatClient, ctx *context.Context) {
-	var r pb.RecieveRequest
-	r.RecieverId = []byte(reciever_id)
-	recieve_client, err := (*chatClient).Recieve(*ctx, &r)
+func receive(receiverId string, chatClient *pb.ChatClient, ctx *context.Context) {
+	var r pb.ReceiveRequest
+	r.ReceiverId = []byte(receiverId)
+	receiveClient, err := (*chatClient).Receive(*ctx, &r)
 	if err != nil {
-		log.Fatalf("failed to create recieve stream with error [%s]", err)
+		log.Fatalf("failed to create receive stream with error [%s]", err)
 	}
 	for {
-		response, err := recieve_client.Recv()
+		response, err := receiveClient.Recv()
 		if err != nil {
-			log.Fatalf("failed to recieve message with error [%s]", err)
+			log.Fatalf("failed to receive message with error [%s]", err)
 		}
-		fmt.Printf("recieved message [%s] from [%s]\n", response.GetIncommingMessage().Data, response.GetIncommingMessage().SenderId)
+		fmt.Printf("received message [%s] from [%s]\n", response.GetIncommingMessage().Data, response.GetIncommingMessage().SenderId)
 	}
 }
 
-func send(reciever_id string, sender_id string, chatClient *pb.ChatClient, ctx *context.Context) {
+func send(receiverId string, senderId string, chatClient *pb.ChatClient, ctx *context.Context) {
 	var m pb.Message
-	m.SenderId = []byte(sender_id)
-	m.RecieverId = []byte(reciever_id)
+	m.SenderId = []byte(senderId)
+	m.ReceiverId = []byte(receiverId)
 	m.Data = []byte("privet👀")
 	m.MessageId = 1
 
@@ -50,7 +50,7 @@ func send(reciever_id string, sender_id string, chatClient *pb.ChatClient, ctx *
 
 func main() {
 	flag.Parse()
-	if (*reciever_mode && (*reciever_id == "" || *sender_id != "")) || (!*reciever_mode && (*reciever_id == "" || *sender_id == "")) {
+	if (*receiverMode && (*receiverId == "" || *senderId != "")) || (!*receiverMode && (*receiverId == "" || *senderId == "")) {
 		log.Fatalf("missing args")
 	}
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -63,9 +63,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if *reciever_mode {
-		recieve(*reciever_id, &chatClient, &ctx)
+	if *receiverMode {
+		receive(*receiverId, &chatClient, &ctx)
 	} else {
-		send(*reciever_id, *sender_id, &chatClient, &ctx)
+		send(*receiverId, *senderId, &chatClient, &ctx)
 	}
 }

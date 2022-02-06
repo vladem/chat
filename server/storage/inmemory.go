@@ -24,6 +24,7 @@ func getInMemoryChatStorage(chatId string) ChatStorage {
 type inMemoryChatStorage struct {
 	messages []*pb.Message
 	requests chan chatStorageAction
+	acting   bool
 }
 
 type chatStorageAction interface {
@@ -81,6 +82,10 @@ func (s *inMemoryChatStorage) processAction(action chatStorageAction) {
 }
 
 func (s *inMemoryChatStorage) Act(cancel chan bool) {
+	if s.acting {
+		log.Panic("double act is forbidden")
+	}
+	s.acting = true
 act:
 	for {
 		select {

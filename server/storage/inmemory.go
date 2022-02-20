@@ -8,14 +8,14 @@ import (
 )
 
 var storages = make(map[string]*inMemoryChatStorage)
-var storagesLock = sync.Mutex{}
+var storagesLock = sync.Mutex{} // todo: get rid of this lock?
 
 func getInMemoryChatStorage(chatId string) ChatStorage {
 	storagesLock.Lock()
 	defer storagesLock.Unlock()
 	var storage *inMemoryChatStorage
 	if _, ok := storages[chatId]; !ok {
-		storage = &inMemoryChatStorage{make([]*pb.Message, 0), make(chan chatStorageAction, 100)}
+		storage = &inMemoryChatStorage{make([]*pb.Message, 0), make(chan chatStorageAction, 100), false}
 		storages[chatId] = storage
 	}
 	return storage

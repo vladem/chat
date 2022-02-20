@@ -10,14 +10,19 @@ message Message {
     bytes data = 5;
 }
 
-message SendResponse {
+message CommunicateParams {
+    bytes sender_id = 1;
+    bytes receiver_id = 2;
 }
 
-message ReceiveRequest {
-    bytes receiver_id = 3;
+message ClientEvent {
+    oneof event {
+        Message outgoing_message = 1;
+        CommunicateParams communicate_params = 2; 
+    }
 }
 
-message ReceiveResponse {
+message ChatEvent {
     // message MessageViewed {
     //     uint64 message_id = 1;
     // }
@@ -29,6 +34,5 @@ message ReceiveResponse {
 }
 
 service Chat {
-    rpc Send(Message) returns (SendResponse);
-    rpc Receive(ReceiveRequest) returns (stream ReceiveResponse);
+    rpc Communicate(stream ClientEvent) returns (stream ChatEvent);
 }

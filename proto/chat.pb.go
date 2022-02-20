@@ -99,14 +99,17 @@ func (x *Message) GetData() []byte {
 	return nil
 }
 
-type SendResponse struct {
+type CommunicateParams struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	SenderId   []byte `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	ReceiverId []byte `protobuf:"bytes,2,opt,name=receiver_id,json=receiverId,proto3" json:"receiver_id,omitempty"`
 }
 
-func (x *SendResponse) Reset() {
-	*x = SendResponse{}
+func (x *CommunicateParams) Reset() {
+	*x = CommunicateParams{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_proto_chat_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -114,13 +117,13 @@ func (x *SendResponse) Reset() {
 	}
 }
 
-func (x *SendResponse) String() string {
+func (x *CommunicateParams) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SendResponse) ProtoMessage() {}
+func (*CommunicateParams) ProtoMessage() {}
 
-func (x *SendResponse) ProtoReflect() protoreflect.Message {
+func (x *CommunicateParams) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_chat_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -132,21 +135,38 @@ func (x *SendResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SendResponse.ProtoReflect.Descriptor instead.
-func (*SendResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CommunicateParams.ProtoReflect.Descriptor instead.
+func (*CommunicateParams) Descriptor() ([]byte, []int) {
 	return file_proto_chat_proto_rawDescGZIP(), []int{1}
 }
 
-type ReceiveRequest struct {
+func (x *CommunicateParams) GetSenderId() []byte {
+	if x != nil {
+		return x.SenderId
+	}
+	return nil
+}
+
+func (x *CommunicateParams) GetReceiverId() []byte {
+	if x != nil {
+		return x.ReceiverId
+	}
+	return nil
+}
+
+type ClientEvent struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ReceiverId []byte `protobuf:"bytes,3,opt,name=receiver_id,json=receiverId,proto3" json:"receiver_id,omitempty"`
+	// Types that are assignable to Event:
+	//	*ClientEvent_OutgoingMessage
+	//	*ClientEvent_CommunicateParams
+	Event isClientEvent_Event `protobuf_oneof:"event"`
 }
 
-func (x *ReceiveRequest) Reset() {
-	*x = ReceiveRequest{}
+func (x *ClientEvent) Reset() {
+	*x = ClientEvent{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_proto_chat_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -154,13 +174,13 @@ func (x *ReceiveRequest) Reset() {
 	}
 }
 
-func (x *ReceiveRequest) String() string {
+func (x *ClientEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReceiveRequest) ProtoMessage() {}
+func (*ClientEvent) ProtoMessage() {}
 
-func (x *ReceiveRequest) ProtoReflect() protoreflect.Message {
+func (x *ClientEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_chat_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -172,30 +192,60 @@ func (x *ReceiveRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReceiveRequest.ProtoReflect.Descriptor instead.
-func (*ReceiveRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ClientEvent.ProtoReflect.Descriptor instead.
+func (*ClientEvent) Descriptor() ([]byte, []int) {
 	return file_proto_chat_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ReceiveRequest) GetReceiverId() []byte {
-	if x != nil {
-		return x.ReceiverId
+func (m *ClientEvent) GetEvent() isClientEvent_Event {
+	if m != nil {
+		return m.Event
 	}
 	return nil
 }
 
-type ReceiveResponse struct {
+func (x *ClientEvent) GetOutgoingMessage() *Message {
+	if x, ok := x.GetEvent().(*ClientEvent_OutgoingMessage); ok {
+		return x.OutgoingMessage
+	}
+	return nil
+}
+
+func (x *ClientEvent) GetCommunicateParams() *CommunicateParams {
+	if x, ok := x.GetEvent().(*ClientEvent_CommunicateParams); ok {
+		return x.CommunicateParams
+	}
+	return nil
+}
+
+type isClientEvent_Event interface {
+	isClientEvent_Event()
+}
+
+type ClientEvent_OutgoingMessage struct {
+	OutgoingMessage *Message `protobuf:"bytes,1,opt,name=outgoing_message,json=outgoingMessage,proto3,oneof"`
+}
+
+type ClientEvent_CommunicateParams struct {
+	CommunicateParams *CommunicateParams `protobuf:"bytes,2,opt,name=communicate_params,json=communicateParams,proto3,oneof"`
+}
+
+func (*ClientEvent_OutgoingMessage) isClientEvent_Event() {}
+
+func (*ClientEvent_CommunicateParams) isClientEvent_Event() {}
+
+type ChatEvent struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Event:
-	//	*ReceiveResponse_IncommingMessage
-	Event isReceiveResponse_Event `protobuf_oneof:"event"`
+	//	*ChatEvent_IncommingMessage
+	Event isChatEvent_Event `protobuf_oneof:"event"`
 }
 
-func (x *ReceiveResponse) Reset() {
-	*x = ReceiveResponse{}
+func (x *ChatEvent) Reset() {
+	*x = ChatEvent{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_proto_chat_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -203,13 +253,13 @@ func (x *ReceiveResponse) Reset() {
 	}
 }
 
-func (x *ReceiveResponse) String() string {
+func (x *ChatEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReceiveResponse) ProtoMessage() {}
+func (*ChatEvent) ProtoMessage() {}
 
-func (x *ReceiveResponse) ProtoReflect() protoreflect.Message {
+func (x *ChatEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_chat_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -221,34 +271,34 @@ func (x *ReceiveResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReceiveResponse.ProtoReflect.Descriptor instead.
-func (*ReceiveResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ChatEvent.ProtoReflect.Descriptor instead.
+func (*ChatEvent) Descriptor() ([]byte, []int) {
 	return file_proto_chat_proto_rawDescGZIP(), []int{3}
 }
 
-func (m *ReceiveResponse) GetEvent() isReceiveResponse_Event {
+func (m *ChatEvent) GetEvent() isChatEvent_Event {
 	if m != nil {
 		return m.Event
 	}
 	return nil
 }
 
-func (x *ReceiveResponse) GetIncommingMessage() *Message {
-	if x, ok := x.GetEvent().(*ReceiveResponse_IncommingMessage); ok {
+func (x *ChatEvent) GetIncommingMessage() *Message {
+	if x, ok := x.GetEvent().(*ChatEvent_IncommingMessage); ok {
 		return x.IncommingMessage
 	}
 	return nil
 }
 
-type isReceiveResponse_Event interface {
-	isReceiveResponse_Event()
+type isChatEvent_Event interface {
+	isChatEvent_Event()
 }
 
-type ReceiveResponse_IncommingMessage struct {
+type ChatEvent_IncommingMessage struct {
 	IncommingMessage *Message `protobuf:"bytes,1,opt,name=incomming_message,json=incommingMessage,proto3,oneof"` // MessageViewed message_viewed = 2;
 }
 
-func (*ReceiveResponse_IncommingMessage) isReceiveResponse_Event() {}
+func (*ChatEvent_IncommingMessage) isChatEvent_Event() {}
 
 var File_proto_chat_proto protoreflect.FileDescriptor
 
@@ -263,24 +313,32 @@ var file_proto_chat_proto_rawDesc = []byte{
 	0x73, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x49, 0x64, 0x12, 0x1f, 0x0a, 0x0b, 0x72, 0x65, 0x63, 0x65,
 	0x69, 0x76, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x72,
 	0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x72, 0x49, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74,
-	0x61, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x22, 0x0e, 0x0a,
-	0x0c, 0x53, 0x65, 0x6e, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x31, 0x0a,
-	0x0e, 0x52, 0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x1f, 0x0a, 0x0b, 0x72, 0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x03,
+	0x61, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x22, 0x51, 0x0a,
+	0x11, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x63, 0x61, 0x74, 0x65, 0x50, 0x61, 0x72, 0x61,
+	0x6d, 0x73, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x08, 0x73, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x49, 0x64, 0x12,
+	0x1f, 0x0a, 0x0b, 0x72, 0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x72, 0x5f, 0x69, 0x64, 0x18, 0x02,
 	0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x72, 0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x72, 0x49, 0x64,
-	0x22, 0x53, 0x0a, 0x0f, 0x52, 0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f,
-	0x6e, 0x73, 0x65, 0x12, 0x37, 0x0a, 0x11, 0x69, 0x6e, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x6e, 0x67,
-	0x5f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x08,
-	0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x10, 0x69, 0x6e, 0x63, 0x6f,
-	0x6d, 0x6d, 0x69, 0x6e, 0x67, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x42, 0x07, 0x0a, 0x05,
-	0x65, 0x76, 0x65, 0x6e, 0x74, 0x32, 0x57, 0x0a, 0x04, 0x43, 0x68, 0x61, 0x74, 0x12, 0x1f, 0x0a,
-	0x04, 0x53, 0x65, 0x6e, 0x64, 0x12, 0x08, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x1a,
-	0x0d, 0x2e, 0x53, 0x65, 0x6e, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2e,
-	0x0a, 0x07, 0x52, 0x65, 0x63, 0x65, 0x69, 0x76, 0x65, 0x12, 0x0f, 0x2e, 0x52, 0x65, 0x63, 0x65,
-	0x69, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x10, 0x2e, 0x52, 0x65, 0x63,
-	0x65, 0x69, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x30, 0x01, 0x42, 0x12,
-	0x5a, 0x10, 0x77, 0x68, 0x63, 0x72, 0x63, 0x2f, 0x63, 0x68, 0x61, 0x74, 0x2f, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x22, 0x92, 0x01, 0x0a, 0x0b, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x45, 0x76, 0x65, 0x6e, 0x74,
+	0x12, 0x35, 0x0a, 0x10, 0x6f, 0x75, 0x74, 0x67, 0x6f, 0x69, 0x6e, 0x67, 0x5f, 0x6d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x08, 0x2e, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x0f, 0x6f, 0x75, 0x74, 0x67, 0x6f, 0x69, 0x6e, 0x67,
+	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x43, 0x0a, 0x12, 0x63, 0x6f, 0x6d, 0x6d, 0x75,
+	0x6e, 0x69, 0x63, 0x61, 0x74, 0x65, 0x5f, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x63, 0x61, 0x74,
+	0x65, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x48, 0x00, 0x52, 0x11, 0x63, 0x6f, 0x6d, 0x6d, 0x75,
+	0x6e, 0x69, 0x63, 0x61, 0x74, 0x65, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x42, 0x07, 0x0a, 0x05,
+	0x65, 0x76, 0x65, 0x6e, 0x74, 0x22, 0x4d, 0x0a, 0x09, 0x43, 0x68, 0x61, 0x74, 0x45, 0x76, 0x65,
+	0x6e, 0x74, 0x12, 0x37, 0x0a, 0x11, 0x69, 0x6e, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x6e, 0x67, 0x5f,
+	0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x08, 0x2e,
+	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x10, 0x69, 0x6e, 0x63, 0x6f, 0x6d,
+	0x6d, 0x69, 0x6e, 0x67, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x42, 0x07, 0x0a, 0x05, 0x65,
+	0x76, 0x65, 0x6e, 0x74, 0x32, 0x33, 0x0a, 0x04, 0x43, 0x68, 0x61, 0x74, 0x12, 0x2b, 0x0a, 0x0b,
+	0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e, 0x69, 0x63, 0x61, 0x74, 0x65, 0x12, 0x0c, 0x2e, 0x43, 0x6c,
+	0x69, 0x65, 0x6e, 0x74, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x1a, 0x0a, 0x2e, 0x43, 0x68, 0x61, 0x74,
+	0x45, 0x76, 0x65, 0x6e, 0x74, 0x28, 0x01, 0x30, 0x01, 0x42, 0x12, 0x5a, 0x10, 0x77, 0x68, 0x63,
+	0x72, 0x63, 0x2f, 0x63, 0x68, 0x61, 0x74, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -297,22 +355,22 @@ func file_proto_chat_proto_rawDescGZIP() []byte {
 
 var file_proto_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proto_chat_proto_goTypes = []interface{}{
-	(*Message)(nil),         // 0: Message
-	(*SendResponse)(nil),    // 1: SendResponse
-	(*ReceiveRequest)(nil),  // 2: ReceiveRequest
-	(*ReceiveResponse)(nil), // 3: ReceiveResponse
+	(*Message)(nil),           // 0: Message
+	(*CommunicateParams)(nil), // 1: CommunicateParams
+	(*ClientEvent)(nil),       // 2: ClientEvent
+	(*ChatEvent)(nil),         // 3: ChatEvent
 }
 var file_proto_chat_proto_depIdxs = []int32{
-	0, // 0: ReceiveResponse.incomming_message:type_name -> Message
-	0, // 1: Chat.Send:input_type -> Message
-	2, // 2: Chat.Receive:input_type -> ReceiveRequest
-	1, // 3: Chat.Send:output_type -> SendResponse
-	3, // 4: Chat.Receive:output_type -> ReceiveResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: ClientEvent.outgoing_message:type_name -> Message
+	1, // 1: ClientEvent.communicate_params:type_name -> CommunicateParams
+	0, // 2: ChatEvent.incomming_message:type_name -> Message
+	2, // 3: Chat.Communicate:input_type -> ClientEvent
+	3, // 4: Chat.Communicate:output_type -> ChatEvent
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_proto_chat_proto_init() }
@@ -334,7 +392,7 @@ func file_proto_chat_proto_init() {
 			}
 		}
 		file_proto_chat_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SendResponse); i {
+			switch v := v.(*CommunicateParams); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -346,7 +404,7 @@ func file_proto_chat_proto_init() {
 			}
 		}
 		file_proto_chat_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReceiveRequest); i {
+			switch v := v.(*ClientEvent); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -358,7 +416,7 @@ func file_proto_chat_proto_init() {
 			}
 		}
 		file_proto_chat_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReceiveResponse); i {
+			switch v := v.(*ChatEvent); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -370,8 +428,12 @@ func file_proto_chat_proto_init() {
 			}
 		}
 	}
+	file_proto_chat_proto_msgTypes[2].OneofWrappers = []interface{}{
+		(*ClientEvent_OutgoingMessage)(nil),
+		(*ClientEvent_CommunicateParams)(nil),
+	}
 	file_proto_chat_proto_msgTypes[3].OneofWrappers = []interface{}{
-		(*ReceiveResponse_IncommingMessage)(nil),
+		(*ChatEvent_IncommingMessage)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

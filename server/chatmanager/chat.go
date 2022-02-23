@@ -1,104 +1,182 @@
 package chatmanager
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	pb "whcrc/chat/proto"
 	"whcrc/chat/server/storage"
 )
 
+// Created and started by chatManager. Stopped once all readers and writers were closed and chat is unregistered from chatManager.
+// At most one active instance of this struct is present for each ChatId within a process. As it been said, chat is an 'active' instance,
+// meaning it has a running goroutine associated with it, which serves as a multiplexor of incomming messages. This struct also holds some
+// resources which should be shared between all readers and writers of single chat (currently a storage, which requires a program-scope lock to be held
+// for instantiation).
 type chat struct {
-	manager             *chatManager
-	chatId              ChatId
-	storage             storage.ChatStorage
-	notifications       chan *pb.Message
-	outputChannels      map[OutputChannel]bool
-	subscribeRequests   chan OutputChannel
-	unsubscribeRequests chan unsubscribeRequest
-	acting              bool
-	stopConfirmation    chan bool
+	manager *chatManager
+	chatId  ChatId
+	storage storage.ChatStorage
+
+	broadcastRequests chan *pb.Message
+
+	readers        map[*chatReader]bool
+	readerRequests chan readerRequest
+
+	writersCount   uint64
+	writerRequests chan writerRequest
+
+	active           bool
+	stopConfirmation chan bool
 }
 
-// public
-func (c *chat) LoadOldMessages(fromId uint64, toId uint64) OutputChannel {
-	out := c.storage.Read(toId) // todo: load more than one message
-	return out
+type readerRequest struct {
+	reader   *chatReader
+	register bool
 }
 
-func (c *chat) Communicate(cancel chan bool) (in InputChannel, out OutputChannel) {
-	in = make(InputChannel)
-	out = c.subscribeForNewMessages()
-	go c.processIncommingMessages(in, out, cancel)
-	return
+type writerRequest struct {
+	writer   *chatWriter
+	register bool
 }
 
-// private
-type unsubscribeRequest struct {
-	outputChannel OutputChannel
-	done          chan bool
+// Implements ChatReader interface. Created by chatManager.
+type chatReader struct {
+	chat         *chat
+	buffer       chan *pb.Message
+	closed       bool
+	unregistered chan bool
+	err          error
+	errMessageId uint64
+}
+
+// Implements ChatWriter interface. Created by chatManager.
+type chatWriter struct {
+	chat         *chat
+	closed       bool
+	unregistered chan bool
 }
 
 func (c *chat) broadcast(message *pb.Message) {
-	for output := range c.outputChannels {
-		output <- message
-	}
-}
-
-func (c *chat) act() {
-	if c.acting {
-		log.Panic("double act is forbidden")
-	}
-	c.acting = true
-act:
-	for {
+	readersToUnregister := make(map[*chatReader]bool)
+	for reader := range c.readers {
 		select {
-		case outputChannel := <-c.subscribeRequests:
-			c.outputChannels[outputChannel] = true
-		case unsubscribeRequest := <-c.unsubscribeRequests:
-			delete(c.outputChannels, unsubscribeRequest.outputChannel)
-			unsubscribeRequest.done <- true
-			if len(c.outputChannels) == 0 {
-				c.manager.requestStop(c.chatId)
-			}
-		case message := <-c.notifications:
-			c.broadcast(message)
-		case <-c.stopConfirmation:
-			break act
+		case reader.buffer <- message:
+			fmt.Printf("sent message [%s] to reader [%p]", message.Data, reader)
+		default:
+			fmt.Printf("reader's [%p] buffer is full, closing it", reader)
+			reader.err = errors.New("buffer is full")
+			reader.errMessageId = message.MessageId
+			readersToUnregister[reader] = true
 		}
 	}
-	fmt.Printf("chat [%v] stopped", c.chatId)
-}
 
-func (c *chat) subscribeForNewMessages() OutputChannel {
-	outputChannel := make(OutputChannel)
-	c.subscribeRequests <- outputChannel
-	return outputChannel
-}
-
-func (c *chat) unsubscribe(outputChannel OutputChannel) {
-	req := unsubscribeRequest{
-		outputChannel: outputChannel,
-		done:          make(chan bool),
+	for reader := range readersToUnregister {
+		delete(c.readers, reader)
+		reader.unregistered <- true
 	}
-	c.unsubscribeRequests <- req
-	<-req.done
 }
 
-func (c *chat) processIncommingMessages(in InputChannel, out OutputChannel, cancel chan bool) {
-	defer c.unsubscribe(out)
-input:
-	for {
-		select {
-		case <-cancel:
-			break input
-		case message := <-in:
-			errChan := c.storage.Write(message)
-			err := <-errChan
-			if err != nil {
-				fmt.Printf("failed to write message [%s] to chat [%v] with error [%v]\n", string(message.Data), c.chatId, err)
-			} else {
-				c.notifications <- message
-			}
+func (c *chat) processOneRequest() (proceed bool) {
+	select {
+	case req := <-c.readerRequests:
+		if req.register {
+			c.readers[req.reader] = true
+			c.manager.registerDone <- c.chatId
+		} else {
+			delete(c.readers, req.reader)
+			req.reader.unregistered <- true
 		}
+	case req := <-c.writerRequests:
+		if req.register {
+			c.writersCount++
+			c.manager.registerDone <- c.chatId
+		} else {
+			c.writersCount--
+			req.writer.unregistered <- true
+		}
+	case message := <-c.broadcastRequests:
+		c.broadcast(message)
+	case <-c.stopConfirmation:
+		return false
 	}
+
+	if len(c.readers) == 0 && c.writersCount == 0 {
+		c.manager.requestStop(c.chatId)
+	}
+
+	return true
+}
+
+func (c *chat) start() {
+	go func() {
+		if c.active {
+			log.Panicf("chat with id [%v] is already started", c.chatId)
+		}
+		c.active = true
+		for c.processOneRequest() {
+		}
+		c.active = false
+		fmt.Printf("chat with id [%v] stopped", c.chatId)
+	}()
+}
+
+func (r *chatReader) LoadOldMessages(fromId uint64, count uint64) chan *pb.Message {
+	// todo: implement me
+	res := make(chan *pb.Message, 1)
+	res <- nil
+	return res
+}
+
+func (r *chatReader) Recv(cancel chan bool) (*pb.Message, error) {
+	if r.closed {
+		panic("using closed reader")
+	}
+	select {
+	case message := <-r.buffer:
+		return message, nil
+	case <-r.unregistered:
+		r.closed = true
+		return nil, r.err
+	case <-cancel:
+		return nil, nil
+	}
+}
+
+func (r *chatReader) Close() {
+	if r.closed {
+		panic("using closed reader")
+	}
+	r.chat.readerRequests <- readerRequest{
+		reader:   r,
+		register: false,
+	}
+	<-r.unregistered
+	r.closed = true
+}
+
+func (w *chatWriter) Send(msg *pb.Message) error {
+	if w.closed {
+		panic("using closed writer")
+	}
+	errChan := w.chat.storage.Write(msg)
+	err := <-errChan
+	if err != nil {
+		fmt.Printf("failed to write message [%s] to chat [%v] with error [%v]\n", string(msg.Data), w.chat.chatId, err)
+		return err
+	}
+	w.chat.broadcastRequests <- msg
+	return nil
+}
+
+func (w *chatWriter) Close() {
+	if w.closed {
+		panic("using closed writer")
+	}
+	w.chat.writerRequests <- writerRequest{
+		writer:   w,
+		register: false,
+	}
+	<-w.unregistered
+	w.closed = true
 }

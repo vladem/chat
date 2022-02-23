@@ -19,23 +19,39 @@ func (c ChatId) String() string {
 	return chatId
 }
 
-type InputChannel = chan *pb.Message
-type OutputChannel = chan *pb.Message
+type ChatReader interface {
+	// Receives messages with ids in specified range: (fromId - count, fromId]. Nil-value received from the channel specifies end of the stream.
+	LoadOldMessages(fromId uint64, count uint64) chan *pb.Message
 
-type Chat interface {
-	LoadOldMessages(fromId uint64, toId uint64) OutputChannel
-	Communicate(cancel chan bool) (in InputChannel, out OutputChannel)
+	// Blocks until new message is received. Wating could be cancelled via sending message to the `cancel` channel.
+	Recv(cancel chan bool) (*pb.Message, error)
+
+	// Method should be called once finished working with ChatReader entity. After Close() is called, usage of any methods on this instance
+	// causes program to panic.
+	Close()
+}
+
+type ChatWriter interface {
+	// Blocks until message is persisted and became visiable to readers.
+	Send(msg *pb.Message) error
+
+	// Method should be called once finished working with ChatWriter entity. After Close() is called, usage of any methods on this instance
+	// causes program to panic.
+	Close()
 }
 
 type ChatManager interface {
-	GetChat(chatId ChatId) chan Chat
+	GetReaderFor(chatId ChatId) ChatReader
+	GetWriterFor(chatId ChatId) ChatWriter
 	Act()
 }
 
 func CreateChatManager() ChatManager {
 	return &chatManager{
-		chats:        make(map[ChatId]*chat),
-		getRequests:  make(chan getRequest),
-		stopRequests: make(chan ChatId),
+		chats:          make(map[ChatId]chatDescriptor),
+		readerRequests: make(chan getReaderRequest),
+		writerRequests: make(chan getWriterRequest),
+		registerDone:   make(chan ChatId),
+		stopRequests:   make(chan ChatId),
 	}
 }

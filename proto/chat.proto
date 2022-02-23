@@ -34,5 +34,6 @@ message ChatEvent {
 }
 
 service Chat {
+    // todo: separate methods for reading/writing 
     rpc Communicate(stream ClientEvent) returns (stream ChatEvent);
 }

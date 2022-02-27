@@ -75,7 +75,7 @@ func main() {
 	}
 	s := grpc.NewServer()
 	pb.RegisterChatServer(s, &ChatService{chatManager: cm.CreateChatManager()})
-	log.Printf("server listening at %v", lis.Addr())
+	log.Printf("server listening at %v\n", lis.Addr())
 	if err = s.Serve(lis); err != nil {
 		log.Fatalf("failed to server with error [%s]", err)
 	}

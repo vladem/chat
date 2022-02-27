@@ -62,9 +62,9 @@ func (c *chat) broadcast(message *pb.Message) {
 	for reader := range c.readers {
 		select {
 		case reader.buffer <- message:
-			fmt.Printf("sent message [%s] to reader [%p]", message.Data, reader)
+			fmt.Printf("sent message [%s] to reader [%p]\n", message.Data, reader)
 		default:
-			fmt.Printf("reader's [%p] buffer is full, closing it", reader)
+			fmt.Printf("reader's [%p] buffer is full, closing it\n", reader)
 			reader.err = errors.New("buffer is full")
 			reader.errMessageId = message.MessageId
 			readersToUnregister[reader] = true
@@ -113,11 +113,15 @@ func (c *chat) start() {
 		if c.active {
 			log.Panicf("chat with id [%v] is already started", c.chatId)
 		}
+		storageCancel := make(chan bool)
+		go c.storage.Act(storageCancel)
 		c.active = true
+		fmt.Printf("chat with id [%v] started\n", c.chatId)
 		for c.processOneRequest() {
 		}
+		storageCancel <- true
 		c.active = false
-		fmt.Printf("chat with id [%v] stopped", c.chatId)
+		fmt.Printf("chat with id [%v] stopped\n", c.chatId)
 	}()
 }
 

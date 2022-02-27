@@ -10,6 +10,7 @@ type ChatId struct {
 }
 
 func (c ChatId) String() string {
+	// todo: name collisions?
 	var chatId string
 	if c.SenderId > c.ReceiverId {
 		chatId = c.ReceiverId + c.SenderId

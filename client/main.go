@@ -45,7 +45,7 @@ func send(receiverId string, senderId string, chatClient *pb.ChatClient, ctx *co
 	if err != nil {
 		log.Fatalf("failed to send request with error [%s]", err)
 	}
-	fmt.Printf("send done succesfully")
+	fmt.Printf("send done succesfully\n")
 }
 
 func main() {

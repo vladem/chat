@@ -1,6 +1,7 @@
 package chatmanager
 
 import (
+	"fmt"
 	"log"
 	pb "whcrc/chat/proto"
 	"whcrc/chat/server/storage"
@@ -54,8 +55,10 @@ func (cm *chatManager) act() {
 	for {
 		select {
 		case readerRequest := <-cm.readerRequests:
+			fmt.Printf("[chat manager] reader request for chat with id [%v]\n", readerRequest.chatId) // todo: logging without boilerplate
 			readerRequest.response <- cm.getReader(readerRequest.chatId)
 		case writerRequest := <-cm.writerRequests:
+			fmt.Printf("[chat manager] writer request for chat with id [%v]\n", writerRequest.chatId)
 			writerRequest.response <- cm.getWriter(writerRequest.chatId)
 		case chatId := <-cm.stopRequests:
 			chatDescr, ok := cm.chats[chatId]
@@ -70,8 +73,9 @@ func (cm *chatManager) act() {
 		case chatId := <-cm.registerDone:
 			if chatDescr, ok := cm.chats[chatId]; ok {
 				chatDescr.inflightRegisterRequests--
+				fmt.Printf("[chat manager] registered reader or writer for chat with id [%v]\n", chatId)
 			} else {
-				log.Fatalf("chat [%v] said it's done register, but it's missing", chatId)
+				log.Fatalf("[chat manager] chat [%v] said it's done register, but it's missing", chatId)
 			}
 		}
 	}

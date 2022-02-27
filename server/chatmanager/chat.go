@@ -33,11 +33,13 @@ type chat struct {
 type readerRequest struct {
 	reader   *chatReader
 	register bool
+	done     chan bool
 }
 
 type writerRequest struct {
 	writer   *chatWriter
 	register bool
+	done     chan bool
 }
 
 // Implements ChatReader interface. Created by chatManager.
@@ -82,7 +84,7 @@ func (c *chat) processOneRequest() (proceed bool) {
 	case req := <-c.readerRequests:
 		if req.register {
 			c.readers[req.reader] = true
-			c.manager.registerDone <- c.chatId
+			req.done <- true
 		} else {
 			delete(c.readers, req.reader)
 			req.reader.unregistered <- true
@@ -90,7 +92,7 @@ func (c *chat) processOneRequest() (proceed bool) {
 	case req := <-c.writerRequests:
 		if req.register {
 			c.writersCount++
-			c.manager.registerDone <- c.chatId
+			req.done <- true
 		} else {
 			c.writersCount--
 			req.writer.unregistered <- true
@@ -113,13 +115,12 @@ func (c *chat) start() {
 		if c.active {
 			log.Panicf("chat with id [%v] is already started", c.chatId)
 		}
-		storageCancel := make(chan bool)
-		go c.storage.Act(storageCancel)
+		go c.storage.Act()
 		c.active = true
 		fmt.Printf("chat with id [%v] started\n", c.chatId)
 		for c.processOneRequest() {
 		}
-		storageCancel <- true
+		c.storage.Close()
 		c.active = false
 		fmt.Printf("chat with id [%v] stopped\n", c.chatId)
 	}()

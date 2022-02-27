@@ -7,7 +7,8 @@ import (
 type ChatStorage interface {
 	Read(messageId uint64) chan *pb.Message
 	Write(message *pb.Message) chan error // sets id of a message
-	Act(cancel chan bool)
+	Act()
+	Close()
 }
 
 func GetChatStorage(chatId string) ChatStorage {

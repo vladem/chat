@@ -20,51 +20,8 @@ type ChatService struct {
 	chatManager cm.ChatManager
 }
 
-type StreamHandler struct {
-	service           *ChatService
-	chat              cm.Chat
-	chatCancel        chan bool
-	readerCancel      chan bool
-	clientMessages    chan *pb.ClientEvent
-	incommingMessages cm.InputChannel
-	outgoingMessages  cm.OutputChannel
-}
-
-func (h *StreamHandler) processClientEvent(event *pb.ClientEvent) {
-	// todo:
-	// 1. communicateParams:
-	// a) h.chat = h.service.chatManager.GetChat(chatId)
-	// b) h.incommingMessages, h.outgoingMessages = h.chat.Communicate()
-	// 2. message:
-	// a) verify(h.chat)
-	// b) h.incommingMessages <- event
-}
-
 func (s *ChatService) Communicate(communicateServer pb.Chat_CommunicateServer) error {
-	handler := StreamHandler{
-		service:           s,
-		chat:              nil,
-		chatCancel:        make(chan bool),
-		readerCancel:      make(chan bool),
-		clientMessages:    make(chan *pb.ClientEvent),
-		incommingMessages: nil,
-		outgoingMessages:  nil,
-	}
-	go func() {
-		// todo: read messages to handler.incommingMessages, with respect to handler.readerCancel
-	}()
-	for {
-		select {
-		case <-communicateServer.Context().Done():
-			handler.chatCancel <- true
-			handler.readerCancel <- true
-			return nil
-		case pbClientEvent := <-handler.clientMessages:
-			handler.processClientEvent(pbClientEvent)
-		case outgoingMessage := <-handler.outgoingMessages:
-			// todo: send message to communicateServer
-		}
-	}
+	return nil
 }
 
 func main() {

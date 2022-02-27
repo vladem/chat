@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	pb "whcrc/chat/proto"
@@ -14,8 +15,9 @@ func getInMemoryChatStorage(chatId string) ChatStorage {
 	storagesLock.Lock()
 	defer storagesLock.Unlock()
 	var storage *inMemoryChatStorage
-	if _, ok := storages[chatId]; !ok {
-		storage = &inMemoryChatStorage{make([]*pb.Message, 0), make(chan chatStorageAction, 100), false}
+	ok := false
+	if storage, ok = storages[chatId]; !ok {
+		storage = &inMemoryChatStorage{make([]*pb.Message, 0), make(chan chatStorageAction, 100), false, make(chan bool)}
 		storages[chatId] = storage
 	}
 	return storage
@@ -25,6 +27,7 @@ type inMemoryChatStorage struct {
 	messages []*pb.Message
 	requests chan chatStorageAction
 	acting   bool
+	stopped  chan bool
 }
 
 type chatStorageAction interface {
@@ -59,7 +62,10 @@ func (s *inMemoryChatStorage) Write(message *pb.Message) chan error {
 	return result
 }
 
-func (s *inMemoryChatStorage) processAction(action chatStorageAction) {
+func (s *inMemoryChatStorage) processAction(action chatStorageAction) (proceed bool) {
+	if action == nil {
+		return false
+	}
 	switch action := action.(type) {
 	default:
 		log.Fatalf("invalid action %T", action)
@@ -79,20 +85,23 @@ func (s *inMemoryChatStorage) processAction(action chatStorageAction) {
 			action.response <- nil
 		}
 	}
+	return true
 }
 
-func (s *inMemoryChatStorage) Act(cancel chan bool) {
+func (s *inMemoryChatStorage) Act() {
 	if s.acting {
 		log.Panic("double act is forbidden")
 	}
+	fmt.Printf("storage for chat with id [] started\n")
 	s.acting = true
-act:
-	for {
-		select {
-		case <-cancel:
-			break act
-		case req := <-s.requests:
-			s.processAction(req)
-		}
+	for s.processAction(<-s.requests) {
 	}
+	s.acting = false
+	s.stopped <- true
+	fmt.Printf("storage for chat with id [] stopped\n")
+}
+
+func (s *inMemoryChatStorage) Close() {
+	s.requests <- nil
+	<-s.stopped
 }

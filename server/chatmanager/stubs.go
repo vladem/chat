@@ -41,18 +41,22 @@ type ChatWriter interface {
 	Close()
 }
 
+type ReaderConfig struct {
+	bufferSize uint64
+}
+
 type ChatManager interface {
-	GetReaderFor(chatId ChatId) ChatReader
+	GetReaderFor(chatId ChatId, config ReaderConfig) ChatReader
 	GetWriterFor(chatId ChatId) ChatWriter
 	Act()
+	Close()
 }
 
 func CreateChatManager() ChatManager {
 	return &chatManager{
-		chats:          make(map[ChatId]chatDescriptor),
-		readerRequests: make(chan getReaderRequest),
-		writerRequests: make(chan getWriterRequest),
-		registerDone:   make(chan ChatId),
-		stopRequests:   make(chan ChatId),
+		chats:    make(map[ChatId]*chat),
+		requests: make(chan chatManagerRequest),
+		closing:  false,
+		closed:   make(chan bool),
 	}
 }

@@ -11,8 +11,8 @@ import (
 
 func TestSimple(t *testing.T) {
 	s := storage.GetChatStorage("TestSimple")
-	cancel := make(chan bool)
-	go s.Act(cancel)
+	go s.Act()
+	defer s.Close()
 	for i := 1; i < 11; i++ {
 		message := pb.Message{Data: []byte(fmt.Sprintf("blabla_%d", i))}
 		resChan := s.Write(&message)
@@ -27,13 +27,12 @@ func TestSimple(t *testing.T) {
 		assert.Equal(t, message.Data, []byte(fmt.Sprintf("blabla_%d", i)), "unexpected message received")
 		assert.Equal(t, message.MessageId, uint64(i), "unexpected messageId received")
 	}
-	cancel <- true
 }
 
 func TestConcurrentWrites(t *testing.T) {
 	s := storage.GetChatStorage("TestConcurrentWrites")
-	cancel := make(chan bool)
-	go s.Act(cancel)
+	go s.Act()
+	defer s.Close()
 	writeResults := make([]chan error, 0)
 	for i := 1; i < 11; i++ {
 		message := pb.Message{Data: []byte(fmt.Sprintf("blabla_%d", i))}
@@ -50,5 +49,4 @@ func TestConcurrentWrites(t *testing.T) {
 		fmt.Printf("TestConcurrentWrites: received %v\n", message)
 		assert.Equal(t, message.Data, []byte(fmt.Sprintf("blabla_%d", i)), "unexpected message received")
 	}
-	cancel <- true
 }

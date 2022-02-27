@@ -7,14 +7,17 @@ import (
 	"whcrc/chat/server/storage"
 )
 
-type chatDescriptor struct {
-	instance                 *chat
-	inflightRegisterRequests uint64
+type chatManagerRequest interface {
+	isChatManagerRequest()
 }
 
 type getReaderRequest struct {
 	chatId   ChatId
+	config   ReaderConfig
 	response chan *chatReader
+}
+
+func (r getReaderRequest) isChatManagerRequest() {
 }
 
 type getWriterRequest struct {
@@ -22,66 +25,83 @@ type getWriterRequest struct {
 	response chan *chatWriter
 }
 
+func (r getWriterRequest) isChatManagerRequest() {
+}
+
+type chatStopRequest struct {
+	chatId ChatId
+}
+
+func (r chatStopRequest) isChatManagerRequest() {
+}
+
 type chatManager struct {
-	chats          map[ChatId]chatDescriptor
-	readerRequests chan getReaderRequest
-	writerRequests chan getWriterRequest
-	registerDone   chan ChatId
-	stopRequests   chan ChatId
+	chats    map[ChatId]*chat
+	requests chan chatManagerRequest
+	closing  bool
+	closed   chan bool
 }
 
-// public
-func (cm *chatManager) Act() {
-	go func() {
-		cm.act()
-	}()
+func (cm *chatManager) Close() {
+
 }
 
-func (cm *chatManager) GetReaderFor(chatId ChatId) ChatReader {
+func (cm *chatManager) GetReaderFor(chatId ChatId, config ReaderConfig) ChatReader {
 	resp := make(chan *chatReader)
-	cm.readerRequests <- getReaderRequest{chatId: chatId, response: resp}
+	cm.requests <- getReaderRequest{chatId: chatId, config: config, response: resp}
 	return <-resp
 }
 
 func (cm *chatManager) GetWriterFor(chatId ChatId) ChatWriter {
 	resp := make(chan *chatWriter)
-	cm.writerRequests <- getWriterRequest{chatId: chatId, response: resp}
+	cm.requests <- getWriterRequest{chatId: chatId, response: resp}
 	return <-resp
 }
 
 // private
 
-func (cm *chatManager) act() {
-	for {
-		select {
-		case readerRequest := <-cm.readerRequests:
-			fmt.Printf("[chat manager] reader request for chat with id [%v]\n", readerRequest.chatId) // todo: logging without boilerplate
-			readerRequest.response <- cm.getReader(readerRequest.chatId)
-		case writerRequest := <-cm.writerRequests:
-			fmt.Printf("[chat manager] writer request for chat with id [%v]\n", writerRequest.chatId)
-			writerRequest.response <- cm.getWriter(writerRequest.chatId)
-		case chatId := <-cm.stopRequests:
-			chatDescr, ok := cm.chats[chatId]
-			if !ok {
-				log.Fatalf("chat [%v] requested stop, but it's missing", chatId)
-			}
-			if chatDescr.inflightRegisterRequests != 0 {
-				return
-			}
-			delete(cm.chats, chatId)
-			chatDescr.instance.stopConfirmation <- true
-		case chatId := <-cm.registerDone:
-			if chatDescr, ok := cm.chats[chatId]; ok {
-				chatDescr.inflightRegisterRequests--
-				fmt.Printf("[chat manager] registered reader or writer for chat with id [%v]\n", chatId)
-			} else {
-				log.Fatalf("[chat manager] chat [%v] said it's done register, but it's missing", chatId)
-			}
+func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
+	if req == nil {
+		fmt.Printf("waiting for all chats to finish")
+		cm.closing = true
+		return true
+	}
+
+	switch request := req.(type) {
+	case getReaderRequest:
+		if cm.closing {
+			log.Panic("[chat manager] request reader after close")
+		}
+		fmt.Printf("[chat manager] reader request for chat with id [%v]\n", request.chatId) // todo: logging without boilerplate
+		request.response <- cm.getReader(request.chatId, request.config)
+	case getWriterRequest:
+		if cm.closing {
+			log.Panic("[chat manager] request writer after close")
+		}
+		fmt.Printf("[chat manager] writer request for chat with id [%v]\n", request.chatId)
+		request.response <- cm.getWriter(request.chatId)
+	case chatStopRequest:
+		chat, ok := cm.chats[request.chatId]
+		if !ok {
+			log.Fatalf("chat [%v] requested stop, but it's missing", request.chatId)
+		}
+		delete(cm.chats, request.chatId)
+		chat.stopConfirmation <- true
+		if len(cm.chats) == 0 {
+			return false
 		}
 	}
+	return true
 }
 
-func (cm *chatManager) getOrCreateChat(chatId ChatId) chatDescriptor {
+func (cm *chatManager) Act() {
+	fmt.Printf("[chat manager] started")
+	for cm.processRequest(<-cm.requests) {
+	}
+	fmt.Printf("[chat manager] stopped")
+}
+
+func (cm *chatManager) getOrCreateChat(chatId ChatId) *chat {
 	if chatDescr, ok := cm.chats[chatId]; ok {
 		return chatDescr
 	}
@@ -97,45 +117,48 @@ func (cm *chatManager) getOrCreateChat(chatId ChatId) chatDescriptor {
 		active:            false,
 		stopConfirmation:  make(chan bool),
 	}
-	descr := chatDescriptor{instance: chat, inflightRegisterRequests: 0}
-	cm.chats[chatId] = descr
+	cm.chats[chatId] = chat
 	chat.start()
-	return descr
+	return chat
 }
 
-func (cm *chatManager) getReader(chatId ChatId) *chatReader {
-	chatDescr := cm.getOrCreateChat(chatId)
+func (cm *chatManager) getReader(chatId ChatId, config ReaderConfig) *chatReader {
+	chat := cm.getOrCreateChat(chatId)
 	reader := &chatReader{
-		chat:         chatDescr.instance,
-		buffer:       make(chan *pb.Message),
+		chat:         chat,
+		buffer:       make(chan *pb.Message, config.bufferSize),
 		closed:       false,
 		unregistered: make(chan bool),
 		err:          nil,
 		errMessageId: 0,
 	}
-	chatDescr.instance.readerRequests <- readerRequest{
+	req := readerRequest{
 		reader:   reader,
 		register: true,
+		done:     make(chan bool),
 	}
-	chatDescr.inflightRegisterRequests++
+	chat.readerRequests <- req
+	<-req.done
 	return reader
 }
 
 func (cm *chatManager) getWriter(chatId ChatId) *chatWriter {
-	chatDescr := cm.getOrCreateChat(chatId)
+	chat := cm.getOrCreateChat(chatId)
 	writer := &chatWriter{
-		chat:         chatDescr.instance,
+		chat:         chat,
 		closed:       false,
 		unregistered: make(chan bool),
 	}
-	chatDescr.instance.writerRequests <- writerRequest{
+	req := writerRequest{
 		writer:   writer,
 		register: true,
+		done:     make(chan bool),
 	}
-	chatDescr.inflightRegisterRequests++
+	chat.writerRequests <- req
+	<-req.done
 	return writer
 }
 
 func (cm *chatManager) requestStop(chatId ChatId) {
-	cm.stopRequests <- chatId
+	cm.requests <- chatStopRequest{chatId: chatId}
 }

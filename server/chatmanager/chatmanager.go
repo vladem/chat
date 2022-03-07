@@ -106,16 +106,18 @@ func (cm *chatManager) getOrCreateChat(chatId ChatId) *chat {
 		return chatDescr
 	}
 	chat := &chat{
-		manager:           cm,
-		chatId:            chatId,
-		storage:           storage.GetChatStorage(chatId.String()), // todo: use ChatId struct
-		broadcastRequests: make(chan *pb.Message),
-		readers:           make(map[*chatReader]bool),
-		readerRequests:    make(chan readerRequest),
-		writersCount:      0,
-		writerRequests:    make(chan writerRequest),
-		active:            false,
-		stopConfirmation:  make(chan bool),
+		manager:                 cm,
+		chatId:                  chatId,
+		storage:                 storage.GetChatStorage(chatId.String()), // todo: use ChatId struct
+		broadcastRequests:       make(chan *pb.Message),
+		lastBroadcastedId:       0,
+		readers:                 make(map[*chatReader]bool),
+		readerRequests:          make(chan readerRequest),
+		writersCount:            0,
+		writerRequests:          make(chan writerRequest),
+		active:                  false,
+		stopConfirmation:        make(chan bool),
+		suspendedReaderRequests: make(chan suspendedReaderRequest),
 	}
 	cm.chats[chatId] = chat
 	chat.start()
@@ -128,14 +130,16 @@ func (cm *chatManager) getReader(chatId ChatId, config ReaderConfig) *chatReader
 		chat:         chat,
 		buffer:       make(chan *pb.Message, config.bufferSize),
 		closed:       false,
-		unregistered: make(chan bool),
-		err:          nil,
-		errMessageId: 0,
+		unregistered: make(chan bool, 1),
+		suspend:      make(chan bool, 1),
+		suspended:    false,
+		counters:     ReaderCounters{},
+		lastReadId:   0,
 	}
 	req := readerRequest{
 		reader:   reader,
 		register: true,
-		done:     make(chan bool),
+		done:     make(chan bool, 1),
 	}
 	chat.readerRequests <- req
 	<-req.done
@@ -147,12 +151,12 @@ func (cm *chatManager) getWriter(chatId ChatId) *chatWriter {
 	writer := &chatWriter{
 		chat:         chat,
 		closed:       false,
-		unregistered: make(chan bool),
+		unregistered: make(chan bool, 1),
 	}
 	req := writerRequest{
 		writer:   writer,
 		register: true,
-		done:     make(chan bool),
+		done:     make(chan bool, 1),
 	}
 	chat.writerRequests <- req
 	<-req.done

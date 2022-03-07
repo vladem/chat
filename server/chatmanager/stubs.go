@@ -9,6 +9,10 @@ type ChatId struct {
 	ReceiverId string
 }
 
+type ReaderCounters struct {
+	bufferOverflow uint64
+}
+
 func (c ChatId) String() string {
 	// todo: name collisions?
 	var chatId string
@@ -20,9 +24,10 @@ func (c ChatId) String() string {
 	return chatId
 }
 
+// ChatReader is NOT thread-safe, concurrent execution of methods is not supported
 type ChatReader interface {
-	// Receives messages with ids in specified range: (fromId - count, fromId]. Nil-value received from the channel specifies end of the stream.
-	LoadOldMessages(fromId uint64, count uint64) chan *pb.Message
+	// Receives messages with ids in specified range: (fromId - count, fromId]
+	LoadOldMessages(fromId uint64, count uint64) []*pb.Message
 
 	// Blocks until new message is received. Wating could be cancelled via sending message to the `cancel` channel.
 	Recv(cancel chan bool) (*pb.Message, error)
@@ -30,6 +35,8 @@ type ChatReader interface {
 	// Method should be called once finished working with ChatReader entity. After Close() is called, usage of any methods on this instance
 	// causes program to panic.
 	Close()
+
+	GetCounters() ReaderCounters
 }
 
 type ChatWriter interface {

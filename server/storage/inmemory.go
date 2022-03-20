@@ -6,24 +6,26 @@ import (
 	"log"
 	"sync"
 	pb "whcrc/chat/proto"
+	cm "whcrc/chat/server/common"
 )
 
-var storages = make(map[string]*inMemoryChatStorage)
+var storages = make(map[cm.ChatId]*inMemoryChatStorage)
 var storagesLock = sync.Mutex{} // todo: get rid of this lock?
 
-func getInMemoryChatStorage(chatId string) ChatStorage {
+func getInMemoryChatStorage(chatId cm.ChatId) ChatStorage {
 	storagesLock.Lock()
 	defer storagesLock.Unlock()
 	var storage *inMemoryChatStorage
 	ok := false
 	if storage, ok = storages[chatId]; !ok {
-		storage = &inMemoryChatStorage{make([]*pb.Message, 0), make(chan chatStorageAction, 100), false, make(chan bool)}
+		storage = &inMemoryChatStorage{chatId, make([]*pb.Message, 0), make(chan chatStorageAction, 100), false, make(chan bool)}
 		storages[chatId] = storage
 	}
 	return storage
 }
 
 type inMemoryChatStorage struct {
+	chatId   cm.ChatId
 	messages []*pb.Message
 	requests chan chatStorageAction
 	acting   bool
@@ -92,7 +94,7 @@ func (s *inMemoryChatStorage) Act() {
 	if s.acting {
 		log.Panic("double act is forbidden")
 	}
-	fmt.Printf("storage for chat with id [] started\n")
+	fmt.Printf("storage for chat with id [%s] started\n", s.chatId.String())
 	s.acting = true
 	for s.processAction(<-s.requests) {
 	}
@@ -104,4 +106,7 @@ func (s *inMemoryChatStorage) Act() {
 func (s *inMemoryChatStorage) Close() {
 	s.requests <- nil
 	<-s.stopped
+	storagesLock.Lock()
+	defer storagesLock.Unlock()
+	delete(storages, s.chatId)
 }

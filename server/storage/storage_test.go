@@ -6,11 +6,13 @@ import (
 	pb "whcrc/chat/proto"
 	"whcrc/chat/server/storage"
 
+	cm "whcrc/chat/server/common"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSimple(t *testing.T) {
-	s := storage.GetChatStorage("TestSimple")
+	s := storage.GetChatStorage(cm.GetChatId("test", "simple"))
 	go s.Act()
 	defer s.Close()
 	for i := 1; i < 11; i++ {
@@ -30,7 +32,7 @@ func TestSimple(t *testing.T) {
 }
 
 func TestConcurrentWrites(t *testing.T) {
-	s := storage.GetChatStorage("TestConcurrentWrites")
+	s := storage.GetChatStorage(cm.GetChatId("test", "concurrent"))
 	go s.Act()
 	defer s.Close()
 	writeResults := make([]chan error, 0)

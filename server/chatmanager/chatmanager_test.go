@@ -5,6 +5,8 @@ import (
 	"testing"
 	pb "whcrc/chat/proto"
 
+	cm "whcrc/chat/server/common"
+
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -17,14 +19,11 @@ var (
 		ReceiverId: []byte("dude"),
 		Data:       []byte("some sophisticated piece of text"),
 	}
-	simpleReaderConfig = ReaderConfig{bufferSize: 1}
+	simpleReaderConfig = ReaderConfig{BufferSize: 1}
 )
 
 func TestSimple(t *testing.T) {
-	chatId := ChatId{
-		SenderId:   "whcrc",
-		ReceiverId: "simple",
-	}
+	chatId := cm.GetChatId("whcrc", "simple")
 	manager := CreateChatManager()
 	go manager.Act()
 	defer manager.Close()
@@ -38,7 +37,7 @@ func TestSimple(t *testing.T) {
 	sent := proto.Clone(&simpleMessage).(*pb.Message)
 	writer.Send(sent)
 	fmt.Printf("sent message\n")
-	cancel := make(chan bool)
+	cancel := make(chan struct{})
 	received, err := reader.Recv(cancel)
 	assert.Empty(t, err)
 	assert.Equal(t, sent.MessageId, uint64(1))
@@ -46,10 +45,7 @@ func TestSimple(t *testing.T) {
 }
 
 func TestManyReaders(t *testing.T) {
-	chatId := ChatId{
-		SenderId:   "whcrc",
-		ReceiverId: "many",
-	}
+	chatId := cm.GetChatId("whcrc", "many")
 	manager := CreateChatManager()
 	go manager.Act()
 	defer manager.Close()
@@ -64,7 +60,7 @@ func TestManyReaders(t *testing.T) {
 	sent := proto.Clone(&simpleMessage).(*pb.Message)
 	writer.Send(sent)
 	assert.Equal(t, sent.MessageId, uint64(1))
-	cancel := make(chan bool)
+	cancel := make(chan struct{})
 	for i, reader := range readers {
 		received, err := reader.Recv(cancel)
 		assert.Empty(t, err)
@@ -74,10 +70,7 @@ func TestManyReaders(t *testing.T) {
 
 func TestReaderRecover(t *testing.T) {
 	// cause reader's buffer to overflow; see overflow counter incremented; see all messages received eventually
-	chatId := ChatId{
-		SenderId:   "whcrc",
-		ReceiverId: "recover",
-	}
+	chatId := cm.GetChatId("whcrc", "recover")
 	manager := CreateChatManager()
 	go manager.Act()
 	defer manager.Close()
@@ -86,7 +79,7 @@ func TestReaderRecover(t *testing.T) {
 
 	readerBufferSize := uint64(3)
 	messagesCount := uint64(readerBufferSize + 5)
-	reader := manager.GetReaderFor(chatId, ReaderConfig{bufferSize: readerBufferSize})
+	reader := manager.GetReaderFor(chatId, ReaderConfig{BufferSize: readerBufferSize})
 	defer reader.Close()
 
 	var sent []*pb.Message
@@ -97,7 +90,7 @@ func TestReaderRecover(t *testing.T) {
 		assert.Equal(t, sent[len(sent)-1].MessageId, uint64(i+1))
 	}
 
-	cancel := make(chan bool)
+	cancel := make(chan struct{})
 	for i := uint64(0); i < messagesCount; i++ {
 		received, err := reader.Recv(cancel)
 		fmt.Printf("received message: [%v]\n", received)

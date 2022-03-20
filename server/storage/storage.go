@@ -2,6 +2,7 @@ package storage
 
 import (
 	pb "whcrc/chat/proto"
+	cm "whcrc/chat/server/common"
 )
 
 type ChatStorage interface {
@@ -11,6 +12,6 @@ type ChatStorage interface {
 	Close()
 }
 
-func GetChatStorage(chatId string) ChatStorage {
+func GetChatStorage(chatId cm.ChatId) ChatStorage {
 	return getInMemoryChatStorage(chatId)
 }

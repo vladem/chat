@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	pb "whcrc/chat/proto"
 
 	"google.golang.org/grpc"
@@ -12,45 +14,28 @@ import (
 )
 
 var (
-	addr         = flag.String("addr", "localhost:8080", "chat server address")
-	receiverId   = flag.String("receiver_id", "", "receiver_id")
-	senderId     = flag.String("sender_id", "", "sender_id")
-	receiverMode = flag.Bool("receiver_mode", true, "receiver mode")
+	addr       = flag.String("addr", "localhost:8080", "chat server address")
+	receiverId = flag.String("receiver_id", "", "receiver_id")
+	senderId   = flag.String("sender_id", "", "sender_id")
 )
 
-func receive(receiverId string, chatClient *pb.ChatClient, ctx *context.Context) {
-	var r pb.ReceiveRequest
-	r.ReceiverId = []byte(receiverId)
-	receiveClient, err := (*chatClient).Receive(*ctx, &r)
-	if err != nil {
-		log.Fatalf("failed to create receive stream with error [%s]", err)
-	}
+func printReceived(stream pb.Chat_CommunicateClient) {
 	for {
-		response, err := receiveClient.Recv()
+		event, err := stream.Recv()
 		if err != nil {
-			log.Fatalf("failed to receive message with error [%s]", err)
+			log.Fatalf("on recv %v", err)
 		}
-		fmt.Printf("received message [%s] from [%s]\n", response.GetIncommingMessage().Data, response.GetIncommingMessage().SenderId)
+		msg := event.GetIncommingMessage()
+		if msg == nil {
+			log.Fatalf("expected message, got: %v", event)
+		}
+		fmt.Printf("%v\n", msg)
 	}
-}
-
-func send(receiverId string, senderId string, chatClient *pb.ChatClient, ctx *context.Context) {
-	var m pb.Message
-	m.SenderId = []byte(senderId)
-	m.ReceiverId = []byte(receiverId)
-	m.Data = []byte("privet👀")
-	m.MessageId = 1
-
-	_, err := (*chatClient).Send(*ctx, &m)
-	if err != nil {
-		log.Fatalf("failed to send request with error [%s]", err)
-	}
-	fmt.Printf("send done succesfully\n")
 }
 
 func main() {
 	flag.Parse()
-	if (*receiverMode && (*receiverId == "" || *senderId != "")) || (!*receiverMode && (*receiverId == "" || *senderId == "")) {
+	if *receiverId == "" || *senderId == "" {
 		log.Fatalf("missing args")
 	}
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -62,10 +47,40 @@ func main() {
 	chatClient := pb.NewChatClient(conn)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	stream, err := chatClient.Communicate(ctx)
+	if err != nil {
+		log.Fatalf("on stream creation %v", err)
+	}
 
-	if *receiverMode {
-		receive(*receiverId, &chatClient, &ctx)
-	} else {
-		send(*receiverId, *senderId, &chatClient, &ctx)
+	{
+		err = stream.Send(&pb.ClientEvent{
+			Event: &pb.ClientEvent_CommunicateParams{
+				CommunicateParams: &pb.CommunicateParams{
+					SenderId:   []byte(*senderId),
+					ReceiverId: []byte(*receiverId),
+				},
+			},
+		})
+		if err != nil {
+			log.Fatalf("on send to server: %v", err)
+		}
+	}
+
+	go printReceived(stream)
+
+	stdinReader := bufio.NewReader(os.Stdin)
+	for {
+		text, err := stdinReader.ReadString('\n')
+		if err != nil {
+			log.Fatalf("on stdin read: %v", err)
+		}
+		err = stream.Send(&pb.ClientEvent{
+			Event: &pb.ClientEvent_OutgoingMessage{
+				OutgoingMessage: text,
+			},
+		})
+		if err != nil {
+			log.Fatalf("on send to server: %v", err)
+		}
 	}
 }

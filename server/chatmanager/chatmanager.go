@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	pb "whcrc/chat/proto"
+	cm "whcrc/chat/server/common"
 	"whcrc/chat/server/storage"
 )
 
@@ -12,7 +13,7 @@ type chatManagerRequest interface {
 }
 
 type getReaderRequest struct {
-	chatId   ChatId
+	chatId   cm.ChatId
 	config   ReaderConfig
 	response chan *chatReader
 }
@@ -21,7 +22,7 @@ func (r getReaderRequest) isChatManagerRequest() {
 }
 
 type getWriterRequest struct {
-	chatId   ChatId
+	chatId   cm.ChatId
 	response chan *chatWriter
 }
 
@@ -29,14 +30,14 @@ func (r getWriterRequest) isChatManagerRequest() {
 }
 
 type chatStopRequest struct {
-	chatId ChatId
+	chatId cm.ChatId
 }
 
 func (r chatStopRequest) isChatManagerRequest() {
 }
 
 type chatManager struct {
-	chats    map[ChatId]*chat
+	chats    map[cm.ChatId]*chat
 	requests chan chatManagerRequest
 	closing  bool
 	closed   chan bool
@@ -46,13 +47,13 @@ func (cm *chatManager) Close() {
 
 }
 
-func (cm *chatManager) GetReaderFor(chatId ChatId, config ReaderConfig) ChatReader {
+func (cm *chatManager) GetReaderFor(chatId cm.ChatId, config ReaderConfig) ChatReader {
 	resp := make(chan *chatReader)
 	cm.requests <- getReaderRequest{chatId: chatId, config: config, response: resp}
 	return <-resp
 }
 
-func (cm *chatManager) GetWriterFor(chatId ChatId) ChatWriter {
+func (cm *chatManager) GetWriterFor(chatId cm.ChatId) ChatWriter {
 	resp := make(chan *chatWriter)
 	cm.requests <- getWriterRequest{chatId: chatId, response: resp}
 	return <-resp
@@ -62,7 +63,7 @@ func (cm *chatManager) GetWriterFor(chatId ChatId) ChatWriter {
 
 func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 	if req == nil {
-		fmt.Printf("waiting for all chats to finish")
+		fmt.Printf("waiting for all chats to finish\n")
 		cm.closing = true
 		return true
 	}
@@ -72,7 +73,7 @@ func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 		if cm.closing {
 			log.Panic("[chat manager] request reader after close")
 		}
-		fmt.Printf("[chat manager] reader request for chat with id [%v]\n", request.chatId) // todo: logging without boilerplate
+		fmt.Printf("[chat manager] reader request for chat with id [%v]\n", request.chatId)
 		request.response <- cm.getReader(request.chatId, request.config)
 	case getWriterRequest:
 		if cm.closing {
@@ -95,20 +96,20 @@ func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 }
 
 func (cm *chatManager) Act() {
-	fmt.Printf("[chat manager] started")
+	fmt.Printf("[chat manager] started\n")
 	for cm.processRequest(<-cm.requests) {
 	}
-	fmt.Printf("[chat manager] stopped")
+	fmt.Printf("[chat manager] stopped\n")
 }
 
-func (cm *chatManager) getOrCreateChat(chatId ChatId) *chat {
+func (cm *chatManager) getOrCreateChat(chatId cm.ChatId) *chat {
 	if chatDescr, ok := cm.chats[chatId]; ok {
 		return chatDescr
 	}
 	chat := &chat{
 		manager:                 cm,
 		chatId:                  chatId,
-		storage:                 storage.GetChatStorage(chatId.String()), // todo: use ChatId struct
+		storage:                 storage.GetChatStorage(chatId),
 		broadcastRequests:       make(chan *pb.Message),
 		lastBroadcastedId:       0,
 		readers:                 make(map[*chatReader]bool),
@@ -124,11 +125,11 @@ func (cm *chatManager) getOrCreateChat(chatId ChatId) *chat {
 	return chat
 }
 
-func (cm *chatManager) getReader(chatId ChatId, config ReaderConfig) *chatReader {
+func (cm *chatManager) getReader(chatId cm.ChatId, config ReaderConfig) *chatReader {
 	chat := cm.getOrCreateChat(chatId)
 	reader := &chatReader{
 		chat:         chat,
-		buffer:       make(chan *pb.Message, config.bufferSize),
+		buffer:       make(chan *pb.Message, config.BufferSize),
 		closed:       false,
 		unregistered: make(chan bool, 1),
 		suspend:      make(chan bool, 1),
@@ -146,7 +147,7 @@ func (cm *chatManager) getReader(chatId ChatId, config ReaderConfig) *chatReader
 	return reader
 }
 
-func (cm *chatManager) getWriter(chatId ChatId) *chatWriter {
+func (cm *chatManager) getWriter(chatId cm.ChatId) *chatWriter {
 	chat := cm.getOrCreateChat(chatId)
 	writer := &chatWriter{
 		chat:         chat,
@@ -163,6 +164,6 @@ func (cm *chatManager) getWriter(chatId ChatId) *chatWriter {
 	return writer
 }
 
-func (cm *chatManager) requestStop(chatId ChatId) {
+func (cm *chatManager) requestStop(chatId cm.ChatId) {
 	cm.requests <- chatStopRequest{chatId: chatId}
 }

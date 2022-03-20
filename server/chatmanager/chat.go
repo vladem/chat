@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	pb "whcrc/chat/proto"
+	cm "whcrc/chat/server/common"
 	"whcrc/chat/server/storage"
 )
 
@@ -15,7 +16,7 @@ import (
 // for instantiation).
 type chat struct {
 	manager *chatManager
-	chatId  ChatId
+	chatId  cm.ChatId
 	storage storage.ChatStorage
 
 	broadcastRequests chan *pb.Message
@@ -186,7 +187,7 @@ func (r *chatReader) suspenedRecv() *pb.Message {
 	return resp.message
 }
 
-func (r *chatReader) Recv(cancel chan bool) (*pb.Message, error) {
+func (r *chatReader) Recv(cancel <-chan struct{}) (*pb.Message, error) {
 	if r.closed {
 		panic("using closed reader")
 	}

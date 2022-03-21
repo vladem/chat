@@ -8,7 +8,7 @@ Simple client-server application to practice concurrency in go, and to try build
 make run_server  # terminal 1
 make run_client me=bob them=alice  # terminal 2
 make run_client me=alice them=bob  # terminal 3
-# type and send (\n-delimeted) messages in terminals 2,3 :)
+# type and send (\n-delimited) messages in terminals 2,3 :)
 ```
 
 ## Testing

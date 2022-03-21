@@ -11,3 +11,13 @@ run_client:
 	go run ./client/ --sender_id=$(me) --receiver_id=$(them)
 test:
 	go test ./server/storage/ ./server/chatmanager/
+build_server:
+	docker build --tag chat-server -f server.Dockerfile .
+build_client:
+	docker build --tag chat-client -f client.Dockerfile .
+run_server_d:
+	docker run -d --name=chat_server --rm chat-server:latest
+stop_server:
+	docker kill chat_server
+run_client_d:
+	docker run -i --net=container:chat_server chat-client:latest /client --receiver_id $(them) --sender_id $(me)

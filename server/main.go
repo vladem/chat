@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -51,14 +50,14 @@ func (s *ChatService) Communicate(srv pb.Chat_CommunicateServer) error {
 			}
 			srv.Send(&pb.ChatEvent{Event: &pb.ChatEvent_IncommingMessage{IncommingMessage: msg}})
 		}
-		fmt.Printf("reader [%s] subhandler done\n", chatId.String())
+		log.Printf("reader [%s] subhandler done", chatId.String())
 	}()
 	writer := s.chatManager.GetWriterFor(chatId)
 	defer writer.Close()
 	for {
 		req, err := srv.Recv()
 		if err != nil {
-			fmt.Printf("error on receive from grpc channel: %v\n", err)
+			log.Printf("error on receive from grpc channel: %v", err)
 			break
 		}
 		msg := req.GetOutgoingMessage()
@@ -73,11 +72,12 @@ func (s *ChatService) Communicate(srv pb.Chat_CommunicateServer) error {
 			Data:       []byte(msg),
 		})
 	}
-	fmt.Printf("handler for %s done\n", chatId.String())
+	log.Printf("handler for %s done", chatId.String())
 	return nil
 }
 
 func main() {
+	log.SetFlags(log.Lmicroseconds)
 	flag.Parse()
 	lis, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -87,7 +87,7 @@ func main() {
 	chatManager := cm.CreateChatManager()
 	go chatManager.Act()
 	pb.RegisterChatServer(s, &ChatService{chatManager: chatManager})
-	log.Printf("server listening at %v\n", lis.Addr())
+	log.Printf("server listening at %v", lis.Addr())
 	if err = s.Serve(lis); err != nil {
 		log.Fatalf("failed to server with error [%s]", err)
 	}

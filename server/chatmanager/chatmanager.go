@@ -1,7 +1,6 @@
 package chatmanager
 
 import (
-	"fmt"
 	"log"
 	pb "whcrc/chat/proto"
 	cm "whcrc/chat/server/common"
@@ -63,7 +62,7 @@ func (cm *chatManager) GetWriterFor(chatId cm.ChatId) ChatWriter {
 
 func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 	if req == nil {
-		fmt.Printf("waiting for all chats to finish\n")
+		log.Printf("waiting for all chats to finish\n")
 		cm.closing = true
 		return true
 	}
@@ -73,13 +72,13 @@ func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 		if cm.closing {
 			log.Panic("[chat manager] request reader after close")
 		}
-		fmt.Printf("[chat manager] reader request for chat with id [%v]\n", request.chatId)
+		log.Printf("[chat manager] reader request for chat with id [%v]\n", request.chatId)
 		request.response <- cm.getReader(request.chatId, request.config)
 	case getWriterRequest:
 		if cm.closing {
 			log.Panic("[chat manager] request writer after close")
 		}
-		fmt.Printf("[chat manager] writer request for chat with id [%v]\n", request.chatId)
+		log.Printf("[chat manager] writer request for chat with id [%v]\n", request.chatId)
 		request.response <- cm.getWriter(request.chatId)
 	case chatStopRequest:
 		chat, ok := cm.chats[request.chatId]
@@ -96,10 +95,10 @@ func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 }
 
 func (cm *chatManager) Act() {
-	fmt.Printf("[chat manager] started\n")
+	log.Printf("[chat manager] started\n")
 	for cm.processRequest(<-cm.requests) {
 	}
-	fmt.Printf("[chat manager] stopped\n")
+	log.Printf("[chat manager] stopped\n")
 }
 
 func (cm *chatManager) getOrCreateChat(chatId cm.ChatId) *chat {

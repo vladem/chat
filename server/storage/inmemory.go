@@ -2,7 +2,6 @@ package storage
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 	pb "whcrc/chat/proto"
@@ -94,13 +93,13 @@ func (s *inMemoryChatStorage) Act() {
 	if s.acting {
 		log.Panic("double act is forbidden")
 	}
-	fmt.Printf("storage for chat with id [%s] started\n", s.chatId.String())
+	log.Printf("storage for chat with id [%s] started\n", s.chatId.String())
 	s.acting = true
 	for s.processAction(<-s.requests) {
 	}
 	s.acting = false
 	s.stopped <- true
-	fmt.Printf("storage for chat with id [] stopped\n")
+	log.Printf("storage for chat with id [] stopped\n")
 }
 
 func (s *inMemoryChatStorage) Close() {

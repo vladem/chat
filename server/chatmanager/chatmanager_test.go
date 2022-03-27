@@ -2,6 +2,7 @@ package chatmanager
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	pb "whcrc/chat/proto"
 
@@ -28,20 +29,20 @@ func TestSimple(t *testing.T) {
 	go manager.Act()
 	defer manager.Close()
 	writer := manager.GetWriterFor(chatId)
-	fmt.Printf("got writer\n")
+	log.Printf("got writer\n")
 	defer writer.Close()
 	reader := manager.GetReaderFor(chatId, simpleReaderConfig)
-	fmt.Printf("got reader\n")
+	log.Printf("got reader\n")
 	defer reader.Close()
 
 	sent := proto.Clone(&simpleMessage).(*pb.Message)
 	writer.Send(sent)
-	fmt.Printf("sent message\n")
+	log.Printf("sent message\n")
 	cancel := make(chan struct{})
 	received, err := reader.Recv(cancel)
 	assert.Empty(t, err)
 	assert.Equal(t, sent.MessageId, uint64(1))
-	fmt.Printf("received message: [%v]\n", received)
+	log.Printf("received message: [%v]\n", received)
 }
 
 func TestManyReaders(t *testing.T) {
@@ -64,7 +65,7 @@ func TestManyReaders(t *testing.T) {
 	for i, reader := range readers {
 		received, err := reader.Recv(cancel)
 		assert.Empty(t, err)
-		fmt.Printf("reader [%d] received message: [%v]\n", i, received)
+		log.Printf("reader [%d] received message: [%v]\n", i, received)
 	}
 }
 
@@ -93,7 +94,7 @@ func TestReaderRecover(t *testing.T) {
 	cancel := make(chan struct{})
 	for i := uint64(0); i < messagesCount; i++ {
 		received, err := reader.Recv(cancel)
-		fmt.Printf("received message: [%v]\n", received)
+		log.Printf("received message: [%v]\n", received)
 		assert.Empty(t, err)
 		assert.Equal(t, received.MessageId, uint64(i+1))
 		if i >= readerBufferSize {

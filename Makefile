@@ -11,10 +11,15 @@ run_client:
 	go run ./client/ --sender_id=$(me) --receiver_id=$(them)
 test:
 	go test ./server/storage/ ./server/chatmanager/
+acceptance:  # docker_uds arg is required, which is, in my case, '/run/user/"$(id -u)"/docker.sock'
+	docker run --name=chat_tests --rm -v $(docker_uds):/var/run/docker.sock chat-tests:latest
 build_server:
-	docker build --tag chat-server -f server.Dockerfile .
+	docker build --tag chat-server -f dockerfiles/server.Dockerfile .
 build_client:
-	docker build --tag chat-client -f client.Dockerfile .
+	docker build --tag chat-client -f dockerfiles/client.Dockerfile .
+build_tests_only:
+	docker build -f dockerfiles/tests.Dockerfile --tag chat-tests .
+build_tests: build_server build_client build_tests_only
 run_server_d:
 	docker run -d --name=chat_server --rm chat-server:latest
 stop_server:

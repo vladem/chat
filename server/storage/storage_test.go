@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	pb "whcrc/chat/proto"
 	"whcrc/chat/server/storage"
@@ -25,7 +26,7 @@ func TestSimple(t *testing.T) {
 		resChan := s.Read(uint64(i))
 		message := <-resChan
 		assert.NotEmptyf(t, message, "message with id [%d] is empty", i)
-		fmt.Printf("TestSimple: received %v\n", message)
+		log.Printf("TestSimple: received %v\n", message)
 		assert.Equal(t, message.Data, []byte(fmt.Sprintf("blabla_%d", i)), "unexpected message received")
 		assert.Equal(t, message.MessageId, uint64(i), "unexpected messageId received")
 	}
@@ -48,7 +49,7 @@ func TestConcurrentWrites(t *testing.T) {
 		resChan := s.Read(uint64(i))
 		message := <-resChan
 		assert.NotEmptyf(t, message, "message with id [%d] is empty", i)
-		fmt.Printf("TestConcurrentWrites: received %v\n", message)
+		log.Printf("TestConcurrentWrites: received %v\n", message)
 		assert.Equal(t, message.Data, []byte(fmt.Sprintf("blabla_%d", i)), "unexpected message received")
 	}
 }

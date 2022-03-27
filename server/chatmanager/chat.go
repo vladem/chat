@@ -2,7 +2,6 @@ package chatmanager
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	pb "whcrc/chat/proto"
 	cm "whcrc/chat/server/common"
@@ -83,9 +82,9 @@ func (c *chat) broadcast(message *pb.Message) {
 		}
 		select {
 		case reader.buffer <- message:
-			fmt.Printf("sent message [%s] to reader [%p]\n", message.Data, reader)
+			log.Printf("sent message [%s] to reader [%p]\n", message.Data, reader)
 		default:
-			fmt.Printf("reader's [%p] buffer is full, suspending it\n", reader)
+			log.Printf("reader's [%p] buffer is full, suspending it\n", reader)
 			raiseFlag(reader.suspend)
 			c.readers[reader] = false // suspend reader
 		}
@@ -148,12 +147,12 @@ func (c *chat) start() {
 		}
 		go c.storage.Act()
 		c.active = true
-		fmt.Printf("chat with id [%v] started\n", c.chatId)
+		log.Printf("chat with id [%v] started\n", c.chatId)
 		for c.processOneRequest() {
 		}
 		c.storage.Close()
 		c.active = false
-		fmt.Printf("chat with id [%v] stopped\n", c.chatId)
+		log.Printf("chat with id [%v] stopped\n", c.chatId)
 	}()
 }
 
@@ -233,7 +232,7 @@ func (w *chatWriter) Send(msg *pb.Message) error {
 	errChan := w.chat.storage.Write(msg)
 	err := <-errChan
 	if err != nil {
-		fmt.Printf("failed to write message [%s] to chat [%v] with error [%v]\n", string(msg.Data), w.chat.chatId, err)
+		log.Printf("failed to write message [%s] to chat [%v] with error [%v]\n", string(msg.Data), w.chat.chatId, err)
 		return err
 	}
 	w.chat.broadcastRequests <- msg

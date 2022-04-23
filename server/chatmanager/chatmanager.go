@@ -87,7 +87,7 @@ func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 		}
 		delete(cm.chats, request.chatId)
 		chat.stopConfirmation <- true
-		if len(cm.chats) == 0 {
+		if len(cm.chats) == 0 && cm.closing {
 			return false
 		}
 	}

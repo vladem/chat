@@ -1,3 +1,6 @@
+# DOCKER_UDS arg is required, which is, in my case, is the output of 'echo /run/user/"$(id -u)"/docker.sock'
+DOCKER_UDS="/run/user/1000/docker.sock"
+
 install_devtools:  # export PATH="$PATH:$(go env GOPATH)/bin" should be run manually, go compiler is considered to be installed
 	sudo apt update \
 	&& sudo apt install -y protobuf-compiler \
@@ -9,10 +12,10 @@ run_server:
 	go run ./server/
 run_client:
 	go run ./client/ --sender_id=$(me) --receiver_id=$(them)
-test:
+test_local:
 	go test ./server/storage/ ./server/chatmanager/
-acceptance:  # docker_uds arg is required, which is, in my case, '/run/user/"$(id -u)"/docker.sock'
-	docker run --name=chat_tests --rm -v $(docker_uds):/var/run/docker.sock chat-tests:latest
+test:
+	docker run --name=chat_tests --rm -v $(DOCKER_UDS):/var/run/docker.sock chat-tests:latest
 build_server:
 	docker build --tag chat-server -f dockerfiles/server.Dockerfile .
 build_client:
@@ -26,3 +29,5 @@ stop_server:
 	docker kill chat_server
 run_client_d:
 	docker run -i --net=container:chat_server chat-client:latest /client --receiver_id $(them) --sender_id $(me)
+format:
+	black tests/ ; isort tests/

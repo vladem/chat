@@ -10,6 +10,9 @@ import (
 	cm "whcrc/chat/server/chatmanager"
 	cmn "whcrc/chat/server/common"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -77,6 +80,11 @@ func (s *ChatService) Communicate(srv pb.Chat_CommunicateServer) error {
 }
 
 func main() {
+	go func() {
+		addr := "localhost:6060"
+		log.Printf("profile server listening at %s\n", addr)
+		log.Println(http.ListenAndServe(addr, nil))
+	}()
 	log.SetFlags(log.Lmicroseconds)
 	flag.Parse()
 	lis, err := net.Listen("tcp", *addr)

@@ -1,27 +1,44 @@
-import docker
-import pytest
-from typing import Optional, Any, List
-import time
-import subprocess as sp
+import os
 import random
 import string
-import os
+import subprocess as sp
+import time
+import urllib.request
+from typing import Any, List, Optional
+
+import docker
+import pytest
 
 
 class ServerContainer:
-    server_image_name = "chat-server" 
+    server_image_name = "chat-server"
 
     def __init__(self):
         self.container: Optional[Any] = None
 
     def __enter__(self):
         client = docker.from_env()
-        self.container = client.containers.run(self.server_image_name, network_mode="container:chat_tests", detach=True)
+        self.container = client.containers.run(
+            self.server_image_name, network_mode="container:chat_tests", detach=True
+        )
         return self
 
-    def __exit__(self, *args, **kwargs):
-        print("server stderr:\n" + self.container.logs().decode())
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is not None:
+            print("server stderr:\n" + self.container.logs().decode())
         self.container.stop()
+
+    def get_stats(self, prefix: str):
+        contents = urllib.request.urlopen(
+            "http://localhost:6060/debug/pprof/heap?debug=1"
+        ).read()
+        for line in contents.decode().split("\n"):
+            if prefix in line:
+                return line.split(prefix)[1].strip()
+        raise RuntimeError("stat not found")
+
+    def heap_usage(self):
+        return int(self.get_stats("# Alloc = "))
 
 
 @pytest.fixture
@@ -30,7 +47,7 @@ def server():
 
 
 def random_str():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 
 def send_messages(sender: sp.Popen) -> List[str]:
@@ -42,7 +59,7 @@ def send_messages(sender: sp.Popen) -> List[str]:
     return msgs
 
 
-def readline_with_timeout(pipe, timeout_s = 1) -> str:
+def readline_with_timeout(pipe, timeout_s=1) -> str:
     line = ""
     start = time.time()
     while not line and (time.time() - start < timeout_s):
@@ -84,8 +101,10 @@ def send_receive():
 
 def test_many_chats(server):
     with server:
-        for i in range(5):
+        # TODO:(whcrc) find out why it fails with big amount of iterations (>50)
+        for i in range(20):
             send_receive()
             print("done iter i = " + str(i))
-            # todo: check, why server stops responding after first chat is closed))
-        # todo: check memory consumption
+        heap_usage = server.heap_usage()
+        print("heap usage: " + str(heap_usage / 2**20) + " mb")
+        assert heap_usage < 3 * 2**20  # 3mb

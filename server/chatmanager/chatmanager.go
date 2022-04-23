@@ -15,6 +15,7 @@ type getReaderRequest struct {
 	chatId   cm.ChatId
 	config   ReaderConfig
 	response chan *chatReader
+	cookie   string
 }
 
 func (r getReaderRequest) isChatManagerRequest() {
@@ -23,6 +24,7 @@ func (r getReaderRequest) isChatManagerRequest() {
 type getWriterRequest struct {
 	chatId   cm.ChatId
 	response chan *chatWriter
+	cookie   string
 }
 
 func (r getWriterRequest) isChatManagerRequest() {
@@ -46,15 +48,15 @@ func (cm *chatManager) Close() {
 
 }
 
-func (cm *chatManager) GetReaderFor(chatId cm.ChatId, config ReaderConfig) ChatReader {
+func (cm *chatManager) GetReaderFor(chatId cm.ChatId, config ReaderConfig, cookie string) ChatReader {
 	resp := make(chan *chatReader)
-	cm.requests <- getReaderRequest{chatId: chatId, config: config, response: resp}
+	cm.requests <- getReaderRequest{chatId: chatId, config: config, response: resp, cookie: cookie}
 	return <-resp
 }
 
-func (cm *chatManager) GetWriterFor(chatId cm.ChatId) ChatWriter {
+func (cm *chatManager) GetWriterFor(chatId cm.ChatId, cookie string) ChatWriter {
 	resp := make(chan *chatWriter)
-	cm.requests <- getWriterRequest{chatId: chatId, response: resp}
+	cm.requests <- getWriterRequest{chatId: chatId, response: resp, cookie: cookie}
 	return <-resp
 }
 
@@ -73,13 +75,13 @@ func (cm *chatManager) processRequest(req chatManagerRequest) (proceed bool) {
 			log.Panic("[chat manager] request reader after close")
 		}
 		log.Printf("[chat manager] reader request for chat with id [%v]\n", request.chatId)
-		request.response <- cm.getReader(request.chatId, request.config)
+		request.response <- cm.getReader(request.chatId, request.config, request.cookie)
 	case getWriterRequest:
 		if cm.closing {
 			log.Panic("[chat manager] request writer after close")
 		}
 		log.Printf("[chat manager] writer request for chat with id [%v]\n", request.chatId)
-		request.response <- cm.getWriter(request.chatId)
+		request.response <- cm.getWriter(request.chatId, request.cookie)
 	case chatStopRequest:
 		chat, ok := cm.chats[request.chatId]
 		if !ok {
@@ -124,7 +126,7 @@ func (cm *chatManager) getOrCreateChat(chatId cm.ChatId) *chat {
 	return chat
 }
 
-func (cm *chatManager) getReader(chatId cm.ChatId, config ReaderConfig) *chatReader {
+func (cm *chatManager) getReader(chatId cm.ChatId, config ReaderConfig, cookie string) *chatReader {
 	chat := cm.getOrCreateChat(chatId)
 	reader := &chatReader{
 		chat:         chat,
@@ -135,6 +137,7 @@ func (cm *chatManager) getReader(chatId cm.ChatId, config ReaderConfig) *chatRea
 		suspended:    false,
 		counters:     ReaderCounters{},
 		lastReadId:   0,
+		cookie:       cookie,
 	}
 	req := readerRequest{
 		reader:   reader,
@@ -146,12 +149,13 @@ func (cm *chatManager) getReader(chatId cm.ChatId, config ReaderConfig) *chatRea
 	return reader
 }
 
-func (cm *chatManager) getWriter(chatId cm.ChatId) *chatWriter {
+func (cm *chatManager) getWriter(chatId cm.ChatId, cookie string) *chatWriter {
 	chat := cm.getOrCreateChat(chatId)
 	writer := &chatWriter{
 		chat:         chat,
 		closed:       false,
 		unregistered: make(chan bool, 1),
+		cookie:       cookie,
 	}
 	req := writerRequest{
 		writer:   writer,

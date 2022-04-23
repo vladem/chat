@@ -38,8 +38,8 @@ type ReaderConfig struct {
 }
 
 type ChatManager interface {
-	GetReaderFor(chatId cm.ChatId, config ReaderConfig) ChatReader
-	GetWriterFor(chatId cm.ChatId) ChatWriter
+	GetReaderFor(chatId cm.ChatId, config ReaderConfig, cookie string) ChatReader
+	GetWriterFor(chatId cm.ChatId, cookie string) ChatWriter
 	Act()
 	Close()
 }

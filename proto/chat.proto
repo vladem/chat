@@ -8,6 +8,7 @@ message Message {
     bytes sender_id = 3;
     bytes receiver_id = 4;
     bytes data = 5;
+    bytes cookie = 6;
 }
 
 message CommunicateParams {

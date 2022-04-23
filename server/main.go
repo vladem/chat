@@ -13,6 +13,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,8 +44,9 @@ func (s *ChatService) Communicate(srv pb.Chat_CommunicateServer) error {
 		}
 		chatId = cmn.GetChatId(string(params.SenderId), string(params.ReceiverId))
 	}
+	cookie := uuid.NewString()
 	go func() {
-		reader := s.chatManager.GetReaderFor(chatId, cm.ReaderConfig{BufferSize: 100})
+		reader := s.chatManager.GetReaderFor(chatId, cm.ReaderConfig{BufferSize: 100}, cookie)
 		defer reader.Close()
 		for {
 			msg, _ := reader.Recv(srv.Context().Done())
@@ -55,7 +57,7 @@ func (s *ChatService) Communicate(srv pb.Chat_CommunicateServer) error {
 		}
 		log.Printf("reader [%s] subhandler done", chatId.String())
 	}()
-	writer := s.chatManager.GetWriterFor(chatId)
+	writer := s.chatManager.GetWriterFor(chatId, cookie)
 	defer writer.Close()
 	for {
 		req, err := srv.Recv()

@@ -29,7 +29,9 @@ make test
 
 ## Nice to have in feature
 - Nice logging (with timestamps and request tracing)
-- Nice CLI interface (don't duplicate sent messages, first of all)
+- Nice CLI interface
+  - don't duplicate sent messages, first of all (+) 
+  - printing
 - Perfomance test (how much concurrent chats is it possible to have on one machine, at what RPS responses are noticeably slow)
 - External storage
 - "Message seen" markers

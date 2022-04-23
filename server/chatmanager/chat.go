@@ -66,6 +66,7 @@ type chatReader struct {
 	suspended    bool
 	counters     ReaderCounters
 	lastReadId   uint64
+	cookie       string
 }
 
 // Implements ChatWriter interface. Created by chatManager.
@@ -73,11 +74,12 @@ type chatWriter struct {
 	chat         *chat
 	closed       bool
 	unregistered chan bool
+	cookie       string
 }
 
 func (c *chat) broadcast(message *pb.Message) {
 	for reader, isActive := range c.readers {
-		if !isActive {
+		if !isActive || reader.cookie == string(message.Cookie) {
 			continue
 		}
 		select {
@@ -229,6 +231,7 @@ func (w *chatWriter) Send(msg *pb.Message) error {
 	if w.closed {
 		panic("using closed writer")
 	}
+	msg.Cookie = []byte(w.cookie)
 	errChan := w.chat.storage.Write(msg)
 	err := <-errChan
 	if err != nil {

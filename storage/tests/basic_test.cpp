@@ -24,7 +24,6 @@ TEST(TestWrite, TestSimple) {
     // EXPECT_STRNE("hello", "world");
     // EXPECT_EQ(7 * 6, 42);
     server->Stop();
-    poller->Stop();
     serverThread.join();
     pollerThread.join();
 }

@@ -6,30 +6,31 @@
 
 namespace NStorage {
 void TPoller::Run() {
-    {
-        const auto guard = std::lock_guard<std::mutex>(Lock);
-        Running = true;
-    }
+    Running.store(true);
     while (true) {
         std::cout << "TPoller sleeping.." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        const auto guard = std::lock_guard<std::mutex>(Lock);
-        if (!Running) {
+        if (!Running.load()) {
             break;
         }
-        if (PendingCoros.empty()) {
-            continue;
+        std::coroutine_handle<> coro;
+        {
+            const auto guard = std::lock_guard<std::mutex>(Lock);
+            if (PendingCoros.empty()) {
+                continue;
+            }
+            coro = PendingCoros.front();
+            PendingCoros.pop();
         }
-        auto coro = PendingCoros.front();
-        PendingCoros.pop();
         std::cout << "TPoller calling coro.." << std::endl;
         coro();
     }
+    std::cout << "Poller main loop finished" << std::endl;
 }
 
 void TPoller::Stop() {
-    const auto guard = std::lock_guard<std::mutex>(Lock);
-    Running = false;
+    std::cout << "Stop poller" << std::endl;
+    Running.store(false);
 }
 
 // TAwaitable Read() {

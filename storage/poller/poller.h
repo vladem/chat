@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <atomic>
 #include <queue>
 #include <string>
 
@@ -48,7 +49,7 @@ public:
 private:
     std::queue<std::coroutine_handle<>> PendingCoros;
     std::mutex Lock;
-    bool Running = false;
+    std::atomic<bool> Running = false;
 };
 
 std::unique_ptr<TPoller> CreatePoller();

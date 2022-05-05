@@ -44,6 +44,7 @@ public:
             return;
         }
         Running = false;
+        Poller->Stop();  // TODO: weird to stop poller here, if it's started outside + TPoller may be destructed right after this method
         Server_->Shutdown();
         Cq_->Shutdown();
     }
@@ -57,18 +58,24 @@ private:
         }
 
         TPoller::TCoroutine Proceed() {
-            const auto this_ = shared_from_this(); // holds 'this' reference until the end of method (TODO: seems like a reason for UB)
+            const auto this_ = shared_from_this(); // holds 'this' reference until the end of method 
             std::cout << "Write started" << std::endl;
             co_await Poller->Write(std::move(*Request_.mutable_name())); // TODO: co_await returning result (ok/error)
             std::cout << "Write done" << std::endl;
-            Responder_.Finish(Reply_, Status::OK, this);
+            {
+                // TODO: fix this
+                // TCalldata may be destroyed only after tag passed to the 'Responder_.Finish' is processed by the Cq
+                Responder_.Finish(Reply_, Status::OK, nullptr);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            }
+            // Responder_.Finish(Reply_, Status::OK, this);
+            // co_await Poller->WaitFinished();  // TODO: implement me
             co_return;
         }
 
         // TODO: remove me
         ~TCallData() {
             std::cout << "~TCallData" << std::endl;
-            // TODO: investigate, explodes after this destructor is called
         }
 
     private:
@@ -87,12 +94,17 @@ private:
         bool ok;
         while (true) {
             GPR_ASSERT(Cq_->Next(&tag, &ok));
+            std::cout << "got event from cq" << std::endl;
             if (!ok) {
                 break;
+            }
+            if (!tag) {
+                continue;
             }
             static_cast<TCallData*>(tag)->Proceed();
             callData = std::make_shared<TCallData>(&Service_, Cq_.get(), Poller.get()); // TODO: limit pending calls?
         }
+        std::cout << "Server main loop finished" << std::endl;
     }
 
     std::unique_ptr<ServerCompletionQueue> Cq_;
